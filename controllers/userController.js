@@ -1,13 +1,20 @@
-// controllers/userController.js
+// financial-server/controllers/userController.js
 const User = require('../models/ userModel');
-// const jwt = require('jsonwebtoken'); // No longer needed
+const bcrypt = require('bcryptjs');
 
-// The generateToken function is removed as we are not using JWT.
-
-// @desc    Register a new user
-// @route   POST /api/users/register
+// Register a new user
 const registerUser = async (req, res) => {
-  const { displayName, email, password } = req.body;
+  const { 
+    displayName, 
+    email, 
+    password, 
+    role, 
+    childrenUsername, 
+    age, 
+    favoriteHobby, 
+    favoriteSubject, 
+    favoriteCartoon 
+  } = req.body;
 
   try {
     const userExists = await User.findOne({ email });
@@ -15,42 +22,52 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = await User.create({
-      displayName,
-      email,
-      password,
-    });
-
-    if (user) {
-      // Respond with user data but WITHOUT the password and token
-      res.status(201).json({
-        _id: user._id,
-        displayName: user.displayName,
-        email: user.email,
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
+    // Check if a parent is trying to register a child's username that doesn't exist
+    if (role === 'parent' && childrenUsername) {
+        const childExists = await User.findOne({ displayName: childrenUsername, role: 'child' });
+        if (!childExists) {
+            return res.status(400).json({ message: 'The specified child username does not exist.' });
+        }
     }
+
+    // Hash the password only if it's provided (for manual signup)
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+
+    const user = new User({ 
+      displayName, 
+      email, 
+      password: hashedPassword, 
+      role, 
+      childrenUsername, 
+      age, 
+      favoriteHobby, 
+      favoriteSubject, 
+      favoriteCartoon 
+    });
+    
+    await user.save();
+    
+    res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
-// @desc    Auth user (Login)
-// @route   POST /api/users/login
+// User login
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // Find the user by email, regardless of their role
     const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
 
-    if (user && (await user.comparePassword(password))) {
-      // Respond with user data but WITHOUT the password and token
-      res.json({
-        _id: user._id,
-        displayName: user.displayName,
-        email: user.email,
-      });
+    // If the user has a password (i.e., not a Google-only user)
+    if (user.password && (await user.comparePassword(password))) {
+      res.json({ _id: user._id, displayName: user.displayName, role: user.role });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
     }

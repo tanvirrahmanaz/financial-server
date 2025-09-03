@@ -1,37 +1,12 @@
-const User = require('../models/userModel');
+// financial-server/routes/userRoutes.js
 
-// Register a new user
-const registerUser = async (req, res) => {
-  const { displayName, email, password, role } = req.body;
+const express = require('express');
+const router = express.Router();
+const { registerUser, loginUser } = require('../controllers/userController');
 
-  try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
+// Define your routes using the 'router' object
+router.post('/register', registerUser);
+router.post('/login', loginUser);
 
-    const user = new User({ displayName, email, password, role });
-    await user.save();
-    res.status(201).json({ message: 'User created successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
-
-// User login
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (user && (await user.comparePassword(password))) {
-      res.json({ _id: user._id, displayName: user.displayName, role: user.role });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
-};
-
-module.exports = { registerUser, loginUser };
+// Export the router so it can be used in other files (like index.js)
+module.exports = router;
